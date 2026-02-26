@@ -1,0 +1,2109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSN Virginia-class Submarine Sonar Dashboard - Enhanced Simulation</title>
+  
+  <!-- Google Fonts Import -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+  
+  <style>
+    :root {
+      --phosphor-green: #00ff41;
+      --phosphor-dim: #00aa2b;
+      --phosphor-faint: #004d14;
+      --amber-warn: #ff8c00;
+      --red-alert: #ff2020;
+      --panel-dark: #0d120d;
+      --panel-darker: #080c08;
+      --steel-border: #3a4a3a;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background-color: var(--panel-dark);
+      color: var(--phosphor-green);
+      font-family: 'Share Tech Mono', monospace;
+      overflow-x: hidden;
+      padding: 20px;
+    }
+
+    h1, h2, h3 {
+      font-family: 'Orbitron', sans-serif;
+      letter-spacing: 2px;
+    }
+
+    /* Main Dashboard Grid */
+    .dashboard {
+      display: grid;
+      grid-template-columns: 380px 680px 450px;
+      gap: 15px;
+      max-width: 1550px;
+      margin: 0 auto;
+    }
+
+    /* Panel Styling - SSN Virginia-class Aesthetic */
+    .panel {
+      background: linear-gradient(135deg, var(--panel-dark) 0%, var(--panel-darker) 100%);
+      border: 3px inset var(--steel-border);
+      padding: 12px;
+      position: relative;
+      box-shadow: inset 0 0 30px rgba(0,0,0,0.9), 0 4px 8px rgba(0,0,0,0.5);
+    }
+
+    /* CSS Rivets at top corners */
+    .panel::before {
+      content: "";
+      position: absolute;
+      top: 6px;
+      left: 6px;
+      width: 12px;
+      height: 12px;
+      background: radial-gradient(circle, #5a6a5a 30%, #2a3a2a 70%);
+      border-radius: 50%;
+      box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 12px;
+      height: 12px;
+      background: radial-gradient(circle, #5a6a5a 30%, #2a3a2a 70%);
+      border-radius: 50%;
+      box-shadow: inset 1px 1px 3px rgba(0,0,0,0.8);
+    }
+
+    /* Panel Labels with Orbitron font */
+    .panel-label {
+      font-family: 'Orbitron', sans-serif;
+      color: var(--phosphor-green);
+      font-size: 14px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 3px;
+      display: flex;
+      align-items: center;
+    }
+
+    .panel-label::before {
+      content: "•";
+      color: var(--phosphor-green);
+      font-size: 18px;
+      margin-right: 8px;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
+    }
+
+    /* CRT Housing for Radar */
+    .crt-housing {
+      position: relative;
+      border: 4px inset var(--steel-border);
+      padding: 8px;
+      background: #0a0f0a;
+      box-shadow: inset 0 0 25px rgba(0,0,0,1), 0 3px 6px rgba(0,0,0,0.4);
+    }
+
+    /* Scanline Overlay Effect */
+    .scanlines {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0,0,0,0.15) 2px,
+        rgba(0,0,0,0.15) 4px
+      );
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    /* CRT Vignette Effect */
+    .vignette {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle, transparent 65%, rgba(0,0,0,0.4) 95%);
+      pointer-events: none;
+      z-index: 11;
+    }
+
+    /* Radar Canvas */
+    #radarCanvas {
+      display: block;
+      width: 100%;
+      height: 580px;
+      background-color: #0a0f0a;
+      cursor: crosshair;
+    }
+
+    /* LCD-style Readout Areas */
+    .lcd-readout {
+      background: rgba(0, 20, 0, 0.6);
+      border: 1px solid var(--phosphor-dim);
+      padding: 8px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      letter-spacing: 1px;
+    }
+
+    .lcd-readout span {
+      color: var(--phosphor-green);
+      text-shadow: 0 0 2px var(--phosphor-green);
+    }
+
+    /* Coordinate Readout */
+    .coordinate-readout {
+      background: rgba(0, 20, 0, 0.7);
+      border: 1px solid var(--phosphor-dim);
+      padding: 6px;
+      margin-bottom: 8px;
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    .coordinate-readout span {
+      color: var(--amber-warn);
+      text-shadow: 0 0 2px var(--amber-warn);
+    }
+
+    /* Clock Display */
+    .clock-display {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 36px;
+      color: var(--phosphor-green);
+      text-align: center;
+      margin-bottom: 15px;
+      background: rgba(0, 20, 0, 0.8);
+      padding: 12px;
+      border: 2px inset var(--phosphor-dim);
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.9);
+    }
+
+    /* Ship Status Grid */
+    .ship-status {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 15px;
+    }
+
+    .status-item {
+      background: rgba(0, 20, 0, 0.7);
+      padding: 6px;
+      border-radius: 2px;
+      font-size: 13px;
+    }
+
+    .status-label {
+      color: var(--phosphor-dim);
+      font-size: 11px;
+      text-transform: uppercase;
+    }
+
+    /* Depth Slider */
+    .depth-control {
+      margin-bottom: 15px;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none;
+      width: 100%;
+      background: transparent;
+    }
+
+    input[type=range]:focus { outline: none; }
+
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: linear-gradient(90deg, #0d1a0d, #0f2a0f, #0d1a0d);
+      border-radius: 0;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.8);
+      border: 1px solid var(--phosphor-dim);
+    }
+
+    input[type=range]::-webkit-slider-thumb {
+      height: 16px;
+      width: 14px;
+      background: linear-gradient(90deg, #2a3a2a, #1a2a1a);
+      cursor: pointer;
+      border-radius: 0;
+      box-shadow: inset 0 0 4px rgba(0,0,0,0.8), 0 0 4px var(--phosphor-green);
+      margin-top: -5px;
+      border: 1px solid var(--phosphor-dim);
+    }
+
+    /* Torpedo Tube Rack - Fixed Interactive Buttons */
+    .torpedo-rack {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 6px;
+      margin-bottom: 15px;
+    }
+
+    .tube-btn {
+      background: linear-gradient(135deg, #0d1a0d 0%, #0a140a 50%, #081208 100%);
+      border: 2px inset var(--phosphor-dim);
+      color: var(--phosphor-green);
+      padding: 6px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      box-shadow: inset 0 0 8px rgba(0,0,0,0.9);
+      transition: all 0.1s;
+    }
+
+    .tube-btn:hover {
+      background: linear-gradient(135deg, #1a2a1a 0%, #0d1a0d 50%, #0b160b 100%);
+      border-color: var(--phosphor-green);
+      box-shadow: inset 0 0 12px rgba(0,0,0,0.9), 0 0 4px var(--phosphor-dim);
+    }
+
+    .tube-btn:active {
+      transform: translateY(1px);
+      border: 2px outset var(--phosphor-dim);
+      background: linear-gradient(135deg, #081208 0%, #061006 50%, #040e04 100%);
+    }
+
+    .tube-btn.ready {
+      background: linear-gradient(135deg, #0f2a0f 0%, #0d1a0d 50%, #0b180b 100%);
+      border-color: var(--phosphor-green);
+    }
+
+    .tube-btn.armed {
+      background: linear-gradient(135deg, #2a0f0f 0%, #1a0d0d 50%, #160b0b 100%);
+      border-color: var(--red-alert);
+      color: var(--red-alert);
+    }
+
+    .tube-btn span {
+      display: block;
+      margin-top: 4px;
+    }
+
+    /* Fire Control Input Fields */
+    .fire-control-inputs {
+      display: grid;
+      grid-template-columns: 80px 1fr auto;
+      gap: 6px;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .input-label {
+      font-size: 12px;
+      color: var(--phosphor-dim);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .fire-input {
+      background: rgba(0, 20, 0, 0.6);
+      border: 1px solid var(--phosphor-dim);
+      color: var(--amber-warn);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 14px;
+      padding: 4px 8px;
+      text-align: center;
+    }
+
+    .fire-input:focus {
+      outline: none;
+      border-color: var(--phosphor-green);
+      box-shadow: 0 0 4px rgba(0,255,65,0.3);
+    }
+
+    /* Fire Control Button */
+    .fire-control-btn {
+      background: linear-gradient(135deg, #2a1a1a 0%, #1a0f0f 50%, #160b0b 100%);
+      border: 3px inset #444;
+      color: var(--red-alert);
+      padding: 8px 12px;
+      font-family: 'Orbitron', sans-serif;
+      font-weight: bold;
+      cursor: pointer;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      box-shadow: inset 0 0 15px rgba(0,0,0,0.9), 0 3px 8px rgba(0,0,0,0.6);
+      white-space: nowrap;
+    }
+
+    .fire-control-btn:hover {
+      background: linear-gradient(135deg, #3a2a2a 0%, #2a1f1f 50%, #261b1b 100%);
+      box-shadow: inset 0 0 20px rgba(0,0,0,0.95), 0 4px 10px rgba(0,0,0,0.7);
+    }
+
+    .fire-control-btn:active {
+      transform: translateY(2px);
+      border: 3px outset #666;
+    }
+
+    .fire-control-btn:disabled {
+      background: linear-gradient(135deg, #1a1a1a 0%, #141414 50%, #121212 100%);
+      border-color: var(--phosphor-dim);
+      color: var(--phosphor-faint);
+      cursor: not-allowed;
+    }
+
+    /* LED Indicators */
+    .led-container {
+      display: flex;
+      gap: 15px;
+      margin-bottom: 15px;
+      padding: 8px;
+      background: rgba(0, 20, 0, 0.5);
+      border-radius: 4px;
+    }
+
+    .led-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .led-label {
+      user-select: none;
+    }
+
+    .led {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #2a3a2a;
+      box-shadow: inset 0 1px 2px rgba(0,0,0,0.6);
+    }
+
+    .led.active {
+      background: var(--phosphor-green);
+      box-shadow: 0 0 4px var(--phosphor-green), inset 0 1px 2px rgba(255,255,255,0.3);
+    }
+
+    /* Contact Log */
+    .contact-log {
+      background: rgba(0, 10, 0, 0.8);
+      border: 1px solid var(--phosphor-dim);
+      height: 180px;
+      overflow-y: auto;
+      padding: 6px;
+      font-size: 12px;
+      margin-bottom: 15px;
+    }
+
+    .log-entry {
+      padding: 3px 0;
+      border-bottom: 1px dashed rgba(0, 50, 0, 0.4);
+    }
+
+    .log-time { color: var(--phosphor-dim); margin-right: 6px; }
+    .log-friendly { color: var(--phosphor-green); }
+    .log-hostile { color: var(--red-alert); }
+    .log-system { color: var(--amber-warn); }
+
+    /* Bearing/Range Readout */
+    .bearing-readout {
+      background: rgba(0, 20, 0, 0.7);
+      border: 1px solid var(--phosphor-dim);
+      padding: 8px;
+      font-size: 14px;
+    }
+
+    /* Acoustic Data Panel */
+    .acoustic-data {
+      background: rgba(0, 20, 0, 0.6);
+      border: 1px solid var(--phosphor-dim);
+      padding: 8px;
+      font-size: 12px;
+    }
+
+    /* Range Filter Slider */
+    .range-control {
+      margin-bottom: 15px;
+    }
+
+    /* Scrollbar Styling */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0a0f0a; }
+    ::-webkit-scrollbar-thumb { background: var(--phosphor-dim); border-radius: 3px; }
+
+    /* Game State Indicators */
+    .game-state-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      margin-bottom: 15px;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      background: rgba(0, 20, 0, 0.8);
+      border-radius: 4px;
+      color: var(--phosphor-green);
+    }
+
+    .game-state-badge.patrol {
+      background: rgba(0, 50, 0, 0.3);
+      border: 1px solid var(--phosphor-dim);
+      box-shadow: inset 0 0 8px rgba(0,255,65,0.1);
+    }
+
+    .game-state-badge.combat {
+      background: rgba(255, 0, 0, 0.1);
+      border: 1px solid var(--red-alert);
+      color: var(--red-alert);
+      box-shadow: inset 0 0 8px rgba(255,32,32,0.2);
+    }
+
+    .game-state-badge.alert {
+      background: rgba(255, 140, 0, 0.2);
+      border: 1px solid var(--amber-warn);
+      color: var(--amber-warn);
+      box-shadow: inset 0 0 8px rgba(255,140,0,0.3);
+    }
+
+    /* Torpedo Status Panel */
+    .torpedo-status {
+      background: rgba(0, 20, 0, 0.6);
+      border: 1px solid var(--phosphor-dim);
+      padding: 8px;
+      margin-bottom: 15px;
+      font-size: 13px;
+    }
+
+    .torpedo-status span {
+      color: var(--amber-warn);
+    }
+  </style>
+</head>
+<body>
+  <div class="dashboard">
+    
+    <!-- LEFT PANEL -->
+    <div class="panel">
+      <h2 class="panel-label">Navigation & Operations</h2>
+      
+      <!-- Game State Display -->
+      <div id="gameStateBadge" class="game-state-badge patrol">PATROL MODE</div>
+      
+      <!-- UTC Clock -->
+      <div class="clock-display" id="utcClock">00:00:00Z</div>
+      
+      <!-- Mission Timer -->
+      <div class="lcd-readout">
+        MISSION ELAPSED TIME: <span id="missionTimer">00:00:00</span>
+      </div>
+      
+      <!-- Ship Status Readout -->
+      <h3 class="panel-label" style="font-size: 12px;">Vessel Statistics</h3>
+      <div class="ship-status">
+        <div class="status-item">
+          <div class="status-label">Depth</div>
+          <span id="depthReadout">0m</span>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Speed</div>
+          <span id="speedReadout">0 kts</span>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Heading</div>
+          <span id="headingReadout">000°</span>
+        </div>
+        <div class="status-item">
+          <div class="status-label">Reactor</div>
+          <span id="reactorReadout">CRITICAL</span>
+        </div>
+      </div>
+
+      <!-- Torpedo Status -->
+      <h3 class="panel-label" style="font-size: 12px;">Torpedo Status</h3>
+      <div class="torpedo-status">
+        <div>FIRE CONTROL: <span id="fireControlStatus">ARMED</span></div>
+        <div>RELOAD TIME: <span id="reloadTimer">READY</span></div>
+        <div>TORPEDOES: <span id="torpedoCount">8/8 READY</span></div>
+      </div>
+
+      <!-- Depth Slider -->
+      <h3 class="panel-label" style="font-size: 12px;">Depth Control</h3>
+      <div class="depth-control">
+        <label for="depthSlider" style="display:block; margin-bottom:6px;">
+          MAX DEPTH FILTER (m)
+        </label>
+        <input type="range" id="depthSlider" min="0" max="500" value="300" step="10">
+      </div>
+
+      <!-- Torpedo Tube Rack - Fixed Interactive Buttons -->
+      <h3 class="panel-label" style="font-size: 12px;">Torpedo Control</h3>
+      <div class="torpedo-rack">
+        <button type="button" class="tube-btn ready" data-tube="1"><span>TUBE 1<br>FRIENDLY</span></button>
+        <button type="button" class="tube-btn armed" data-tube="2"><span>TUBE 2<br>ARMED</span></button>
+        <button type="button" class="tube-btn" data-tube="3"><span>TUBE 3<br>EMPTY</span></button>
+        <button type="button" class="tube-btn ready" data-tube="4"><span>TUBE 4<br>FRIENDLY</span></button>
+        <button type="button" class="tube-btn armed" data-tube="5"><span>TUBE 5<br>HOSTILE</span></button>
+        <button type="button" class="tube-btn" data-tube="6"><span>TUBE 6<br>EMPTY</span></button>
+        <button type="button" class="tube-btn ready" data-tube="7"><span>TUBE 7<br>FRIENDLY</span></button>
+        <button type="button" class="tube-btn armed" data-tube="8"><span>TUBE 8<br>HOSTILE</span></button>
+      </div>
+
+      <!-- Fire Control Button -->
+      <button id="fireControlBtn" class="fire-control-btn">
+        FIRE CONTROL — ARMED
+      </button>
+    </div>
+
+    <!-- CENTER PANEL (Radar) -->
+    <div class="panel">
+      <h2 class="panel-label">Sonar Display Array</h2>
+      
+      <div class="crt-housing">
+        <canvas id="radarCanvas" width="680" height="580"></canvas>
+        
+        <!-- CRT Effects -->
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
+      </div>
+
+      <!-- Coordinate Readout Panel -->
+      <h3 class="panel-label" style="font-size: 12px;">Target Coordinates</h3>
+      <div class="coordinate-readout">
+        BRG: <span id="currentBearing">--°</span> / RNG: <span id="currentRange">-- nm</span>
+      </div>
+
+      <!-- Thin Label Strip -->
+      <div style="margin-top: 12px; display:flex; justify-content:space-between; font-size: 13px;">
+        <span>FPS: <span id="fpsDisplay" style="color:var(--phosphor-green)">60</span></span>
+        <span>CONTACTS: <span id="contactCount" style="color:var(--phosphor-green)">2</span></span>
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <div class="panel">
+      <h2 class="panel-label">Acoustic Analysis</h2>
+      
+      <!-- LED Indicators -->
+      <div class="led-container">
+        <div class="led-group" id="sonarToggle">
+          <div id="sonarLed" class="led active"></div>
+          <span class="led-label">SONAR ACTIVE</span>
+        </div>
+        <div class="led-group" id="ghostToggle">
+          <div id="ghostLed" class="led active"></div>
+          <span class="led-label">GHOST ECHOES</span>
+        </div>
+        <div class="led-group" id="trailToggle">
+          <div id="trailLed" class="led active"></div>
+          <span class="led-label">TRAILS</span>
+        </div>
+      </div>
+
+      <!-- Range Filter Slider -->
+      <h3 class="panel-label" style="font-size: 12px;">Range Filtering</h3>
+      <div class="range-control">
+        <label for="rangeSlider" style="display:block; margin-bottom:6px;">
+          MIN RANGE FILTER (nm)
+        </label>
+        <input type="range" id="rangeSlider" min="5" max="100" value="20" step="5">
+      </div>
+
+      <!-- Coordinate Input Panel -->
+      <h3 class="panel-label" style="font-size: 12px;">Target Coordinates</h3>
+      <div class="fire-control-inputs">
+        <span class="input-label">BRG</span>
+        <input type="number" id="targetBearing" class="fire-input" min="0" max="359" value="0">
+        <span class="input-label">°</span>
+      </div>
+      <div class="fire-control-inputs">
+        <span class="input-label">RNG</span>
+        <input type="number" id="targetRange" class="fire-input" min="1" max="70" value="20">
+        <span class="input-label">nm</span>
+      </div>
+
+      <!-- Fire Button -->
+      <button id="fireBtn" class="fire-control-btn" style="width: 100%; margin-bottom: 15px;">
+        FIRE
+      </button>
+
+      <!-- Contact Log -->
+      <h3 class="panel-label" style="font-size: 12px;">Contact Log</h3>
+      <div class="contact-log" id="contactLog">
+        <div class="log-entry">
+          <span class="log-time">0000Z</span>
+          <span class="log-system">System initialized. Sonar active.</span>
+        </div>
+        <div class="log-entry">
+          <span class="log-time">0015Z</span>
+          <span class="log-friendly">GOBLIN-1 detected at bearing 45°.</span>
+        </div>
+      </div>
+
+      <!-- Bearing/Range Readout -->
+      <h3 class="panel-label" style="font-size: 12px;">Target Data</h3>
+      <div class="bearing-readout">
+        <div>TRACKED CONTACTS: <span id="trackedCount">0</span></div>
+        <br>
+        <div>LATEST ACQUISITION:</div>
+        <div style="margin-top:4px;">
+          ID: <span id="latestContactId" style="color:var(--amber-warn)">--</span><br>
+          BEARING: <span id="latestBearing">--°</span> | 
+          RANGE: <span id="latestRange">-- nm</span><br>
+          DEPTH: <span id="latestDepth">-- m</span>
+        </div>
+      </div>
+
+      <!-- Acoustic Environment Data -->
+      <h3 class="panel-label" style="font-size: 12px;">Acoustic Conditions</h3>
+      <div class="acoustic-data">
+        <div>NOISE FLOOR: <span id="noiseFloor">-45 dB</span></div>
+        <div>TEMPERATURE: <span id="waterTemp">18°C at 200m</span></div>
+        <div>SALINITY: <span id="salinity">35 ppt</span></div>
+        <div>CURRENT: <span id="currentDir">NE at 2 kts</span></div>
+      </div>
+
+    </div>
+  </div>
+
+<script>
+// Setup canvas and context
+const canvas = document.getElementById('radarCanvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+
+// Canvas dimensions
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+
+// Game state constants
+const GAME_STATE = {
+  PATROL: 'PATROL',
+  COMBAT: 'COMBAT',
+  RELOADING: 'RELOADING',
+  ALERT: 'ALERT'
+};
+
+// State variables
+let contacts = [
+  { 
+    id: 'GOBLIN-1', 
+    x: 340, 
+    y: 150, 
+    speed: 0.75, 
+    angle: Math.PI / 4, 
+    depth: 50,
+    type: 'friendly',
+    color: '#00ff41',
+    trail: [],
+    lastInSweep: false,
+    undetectedFrames: 0,
+    radius: 3
+  },
+  { 
+    id: 'SKUNK-2', 
+    x: 580, 
+    y: 400, 
+    speed: 0.6, 
+    angle: -Math.PI / 3, 
+    depth: 200,
+    type: 'hostile',
+    color: '#ff2020',
+    trail: [],
+    lastInSweep: false,
+    undetectedFrames: 0,
+    radius: 4
+  }
+];
+
+let torpedoes = [];
+let explosions = [];
+
+// System state
+const MAX_TRAIL_LENGTH = 10;
+const SWEEP_SPEED = Math.PI / 320;
+let sweepAngle = 0;
+let lastTime = performance.now();
+let frameCount = 0;
+let fps = 60;
+
+// Filter settings (in nm, scale: 5px = 1nm)
+let minRangeNm = 5;
+let maxDepthM = 300;
+
+// Toggle states
+let sonarActive = true;
+let ghostEchoesEnabled = true;
+let trailsEnabled = true;
+
+// Coordinate tracking for mouse hover
+let mouseX = null;
+let mouseY = null;
+
+// Reload state
+let isReloading = false;
+let reloadTimeLeft = 0;
+
+// Game State
+let gameState = GAME_STATE.PATROL;
+let lastStateChange = performance.now();
+
+// Audio context for sonar - Lazy initialization
+let audioCtx = null;
+
+// Timer state
+let missionStartTime = performance.now();
+let lastUtcUpdate = performance.now();
+
+// Initialize contact logs
+const logContainer = document.getElementById('contactLog');
+
+function addLogEntry(message, type = 'system') {
+  try {
+    const now = new Date();
+    const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}${String(now.getUTCMinutes()).padStart(2, '0')}Z`;
+    
+    const entry = document.createElement('div');
+    entry.className = 'log-entry';
+    
+    let logClass = 'log-system';
+    if (type === 'friendly') logClass = 'log-friendly';
+    if (type === 'hostile') logClass = 'log-hostile';
+    
+    entry.innerHTML = `<span class="log-time">${utcTime}</span><span class="${logClass}">${message}</span>`;
+    
+    // Insert at top
+    logContainer.insertBefore(entry, logContainer.firstChild);
+    
+    // Keep only last 30 entries
+    while (logContainer.children.length > 30) {
+      logContainer.removeChild(logContainer.lastChild);
+    }
+  } catch (e) {
+    console.error('Error adding log entry:', e);
+  }
+}
+
+function initAudio() {
+  try {
+    if (!audioCtx) {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      audioCtx = new AudioContext();
+    }
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+    return true;
+  } catch (e) {
+    console.error('Audio initialization failed:', e);
+    return false;
+  }
+}
+
+// Create a single echo ping with specified parameters
+function createEchoPing(baseFreq, volume, delay, bearingAngle, contactSpeed, dopplerFactor = 1.0) {
+  try {
+    if (!initAudio()) {
+      return;
+    }
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    
+    // Apply Doppler shift based on relative speed
+    let adjustedFreq = baseFreq * dopplerFactor;
+    if (typeof contactSpeed !== 'undefined' && contactSpeed > 0) {
+      const dopplerShift = 1 + (contactSpeed * 0.03); // ±3% shift max
+      adjustedFreq *= dopplerShift;
+    }
+    
+    osc.frequency.setValueAtTime(adjustedFreq, audioCtx.currentTime);
+    gainNode.gain.setValueAtTime(volume, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+    
+    // Stereo panning based on bearing
+    const panner = audioCtx.createStereoPanner();
+    panner.pan.value = Math.sin(bearingAngle);
+    
+    osc.connect(panner);
+    panner.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.1);
+  } catch (e) {
+    console.error('Error creating echo ping:', e);
+  }
+}
+
+// Play sonar ping with realistic echoes
+function playSonarPing(bearingAngle, contactSpeed) {
+  try {
+    if (!initAudio()) {
+      return;
+    }
+    
+    // Base frequency for primary ping
+    const baseFreq = 1200;
+    
+    // Primary direct path ping (immediate)
+    createEchoPing(baseFreq, 0.15, 0, bearingAngle, contactSpeed);
+    
+    // First-order echoes (shorter delay reflections) - ~60% of original volume
+    setTimeout(() => {
+      createEchoPing(baseFreq * 0.98, 0.09, 0, bearingAngle, contactSpeed, 0.98); // Slightly lower pitch
+    }, 250);
+    
+    setTimeout(() => {
+      createEchoPing(baseFreq * 1.02, 0.08, 0, bearingAngle, contactSpeed, 1.02); // Slightly higher pitch
+    }, 450);
+    
+    // Second-order echoes (medium delay reflections) - ~35% of original volume  
+    setTimeout(() => {
+      createEchoPing(baseFreq * 0.96, 0.05, 0, bearingAngle, contactSpeed, 0.96);
+    }, 800);
+    
+    setTimeout(() => {
+      createEchoPing(baseFreq * 1.04, 0.04, 0, bearingAngle, contactSpeed, 1.04);
+    }, 1200);
+    
+    // Third-order echoes (longer delay reflections) - ~15% of original volume
+    setTimeout(() => {
+      createEchoPing(baseFreq * 0.94, 0.03, 0, bearingAngle, contactSpeed, 0.94);
+    }, 1800);
+    
+    // Visual ping effects for echoes (echo rings)
+    setTimeout(() => { createSonarEchoRing(sweepAngle, 0.7); }, 250);
+    setTimeout(() => { createSonarEchoRing(sweepAngle, 0.5); }, 450);
+    setTimeout(() => { createSonarEchoRing(sweepAngle, 0.3); }, 800);
+    
+  } catch (e) {
+    console.error('Error playing sonar ping:', e);
+  }
+}
+
+// Play radar bleep with error handling
+function playRadarBleep() {
+  try {
+    if (!initAudio()) {
+      return;
+    }
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(220, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(60, audioCtx.currentTime + 0.3);
+    
+    const panner = audioCtx.createStereoPanner();
+    panner.pan.value = Math.random() * 2 - 1;
+    
+    osc.connect(panner);
+    panner.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    gainNode.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.6);
+  } catch (e) {
+    console.error('Error playing radar bleep:', e);
+  }
+}
+
+// Play fire control sound with error handling
+function playFireControl() {
+  try {
+    if (!initAudio()) {
+      return;
+    }
+    
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.2);
+    
+    gainNode.gain.setValueAtTime(0.4, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+    
+    osc.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.35);
+  } catch (e) {
+    console.error('Error playing fire control sound:', e);
+  }
+}
+
+// Play explosion sound for hits
+function playExplosionSound() {
+  try {
+    if (!initAudio()) {
+      return;
+    }
+    
+    // Low frequency burst for explosion
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.4);
+    
+    gainNode.gain.setValueAtTime(0.6, audioCtx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 1.2);
+    
+    const panner = audioCtx.createStereoPanner();
+    panner.pan.value = Math.random() * 2 - 1;
+    
+    osc.connect(panner);
+    panner.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 1.3);
+  } catch (e) {
+    console.error('Error playing explosion sound:', e);
+  }
+}
+
+let sonarWaves = [];
+let echoRings = [];
+let ghostBlips = [];
+
+// Animation effects arrays
+function createSonarEchoRing(sweepAngle, intensity = 1.0) {
+  try {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+    
+    echoRings.push({
+      x: centerX + Math.cos(sweepAngle) * (canvas.width/1.8),
+      y: centerY + Math.sin(sweepAngle) * (canvas.width/1.8),
+      radius: 5,
+      opacity: 0.6 * intensity,
+      maxRadius: canvas.width / 1.2
+    });
+  } catch (e) {
+    console.error('Error creating sonar echo ring:', e);
+  }
+}
+
+function addGhostBlip(contact, angleFromCenter, dist) {
+  if (!ghostEchoesEnabled) return;
+
+  try {
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const ghostDist = Math.max(50, dist - (contact.speed * 3));
+    const ghostX = centerX + Math.cos(angleFromCenter) * ghostDist;
+    const ghostY = centerY + Math.sin(angleFromCenter) * ghostDist;
+
+    ghostBlips.push({
+      x: contact.x,
+      y: contact.y,
+      ghostX: ghostX,
+      ghostY: ghostY,
+      opacity: 0.8,
+      age: 0,
+      maxAge: 15
+    });
+  } catch (e) {
+    console.error('Error adding ghost blip:', e);
+  }
+}
+
+// Draw ocean background with depth illusion
+function drawBackground() {
+  try {
+    const bgGradient = ctx.createRadialGradient(
+      canvas.width/2, canvas.height/2, 0,
+      canvas.width/2, canvas.height/2, Math.max(canvas.width, canvas.height)/1.5
+    );
+    bgGradient.addColorStop(0, "#0a1a2a");
+    bgGradient.addColorStop(1, "#000000");
+
+    ctx.fillStyle = bgGradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Subtle seabed noise
+    const noiseSize = Math.floor(canvas.width * canvas.height / 500);
+    for (let i = 0; i < noiseSize; i++) {
+      if (i % 3 === 0) {
+        ctx.fillStyle = `rgba(0, 30, 60, ${Math.random() * 0.1})`;
+        const x = Math.random() * canvas.width;
+        const y = Math.random() * canvas.height;
+        ctx.fillRect(x, y, 2, 2);
+      }
+    }
+
+    // Grid lines
+    ctx.strokeStyle = "rgba(0, 255, 64, 0.1)";
+    ctx.lineWidth = 1;
+
+    const gridSize = 100;
+    ctx.beginPath();
+    for (let x = 0; x <= canvas.width; x += gridSize) {
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+    }
+    for (let y = 0; y <= canvas.height; y += gridSize) {
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+    }
+    ctx.stroke();
+
+    // Depth rings
+    const maxRadius = Math.hypot(canvas.width/2, canvas.height/2);
+    const depthScale = maxRadius / 500;
+
+    for (let depth = 100; depth <= 400; depth += 100) {
+      if (depth <= maxDepthM) {
+        const r = depth * depthScale;
+        ctx.strokeStyle = `rgba(0, 255, 64, ${0.1 + (depth/1000)})`;
+        ctx.setLineDash([5, 3]);
+        ctx.beginPath();
+        ctx.arc(canvas.width/2, canvas.height/2, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Depth label
+        ctx.fillStyle = "rgba(0, 255, 64, 0.3)";
+        ctx.font = "10px 'Share Tech Mono'";
+        ctx.textAlign = "center";
+        ctx.fillText(`${depth}m`, canvas.width/2 + r - 15, canvas.height/2);
+      }
+    }
+
+    // Crosshair at center
+    ctx.strokeStyle = "rgba(0, 255, 64, 0.3)";
+    ctx.beginPath();
+    ctx.arc(canvas.width/2, canvas.height/2, 100, 0, Math.PI * 2);
+    ctx.stroke();
+  } catch (e) {
+    console.error('Error drawing background:', e);
+  }
+}
+
+// Draw coordinate crosshair
+function drawCoordinateCrosshair() {
+  if (mouseX !== null && mouseY !== null) {
+    // Draw crosshair lines
+    ctx.strokeStyle = "rgba(255, 140, 0, 0.6)";
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(mouseX - 10, mouseY);
+    ctx.lineTo(mouseX + 10, mouseY);
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.moveTo(mouseX, mouseY - 10);
+    ctx.lineTo(mouseX, mouseY + 10);
+    ctx.stroke();
+    
+    // Draw small circle at cursor
+    ctx.strokeStyle = "rgba(255, 140, 0, 0.8)";
+    ctx.beginPath();
+    ctx.arc(mouseX, mouseY, 3, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+}
+
+// Animation effect rendering
+function drawAnimationEffects() {
+  // Draw explosion effects (expanding orange/red circles)
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    const effect = explosions[i];
+    
+    if (effect.opacity <= 0) {
+      explosions.splice(i, 1);
+      continue;
+    }
+    
+    ctx.strokeStyle = `rgba(255, 69, 0, ${effect.opacity})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Inner circle for explosion effect
+    ctx.fillStyle = `rgba(255, 165, 0, ${effect.opacity * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(effect.x, effect.y, effect.radius * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    
+    effect.radius += 4;
+    effect.opacity -= 0.015; // Fade over ~1.5 seconds (100 frames at 60fps)
+  }
+  
+  // Draw torpedoes
+  for (let i = torpedoes.length - 1; i >= 0; i--) {
+    const torpedo = torpedoes[i];
+    
+    if (!torpedo.active) {
+      torpedoes.splice(i, 1);
+      continue;
+    }
+    
+    // Update torpedo position
+    torpedo.x += Math.cos(torpedo.angle) * torpedo.speed;
+    torpedo.y += Math.sin(torpedo.angle) * torpedo.speed;
+    
+    // Check bounds
+    if (torpedo.x < -20 || torpedo.x > canvas.width + 20 || 
+        torpedo.y < -20 || torpedo.y > canvas.height + 20) {
+      torpedoes.splice(i, 1);
+      continue;
+    }
+    
+    // Draw torpedo trail
+    ctx.strokeStyle = `rgba(255, 165, 0, ${torpedo.opacity})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let j = 0; j < torpedo.trail.length; j++) {
+      const pos = torpedo.trail[j];
+      if (j === 0) ctx.moveTo(pos.x, pos.y);
+      else ctx.lineTo(pos.x, pos.y);
+    }
+    ctx.stroke();
+    
+    // Draw torpedo head
+    ctx.fillStyle = `rgba(255, 165, 0, ${torpedo.opacity})`;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = 'orange';
+    ctx.beginPath();
+    ctx.arc(torpedo.x, torpedo.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Update trail
+    torpedo.trail.push({ x: torpedo.x, y: torpedo.y });
+    if (torpedo.trail.length > 15) {
+      torpedo.trail.shift();
+    }
+    torpedo.opacity -= 0.02;
+    
+    ctx.shadowBlur = 0;
+  }
+  
+  // Draw explosion effects
+  for (let i = explosions.length - 1; i >= 0; i--) {
+    const effect = explosions[i];
+    
+    if (effect.opacity <= 0) {
+      explosions.splice(i, 1);
+      continue;
+    }
+    
+    ctx.strokeStyle = `rgba(255, 69, 0, ${effect.opacity})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
+    ctx.stroke();
+    
+    // Inner circle for explosion effect
+    ctx.fillStyle = `rgba(255, 165, 0, ${effect.opacity * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(effect.x, effect.y, effect.radius * 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    
+    effect.radius += 4;
+    effect.opacity -= 0.015; // Fade over ~1.5 seconds (100 frames at 60fps)
+  }
+}
+
+// Collision detection function
+function checkCollisions() {
+  try {
+    // Check contact-to-contact collisions
+    for (let i = 0; i < contacts.length; i++) {
+      for (let j = i + 1; j < contacts.length; j++) {
+        const c1 = contacts[i];
+        const c2 = contacts[j];
+        
+        const dx = c1.x - c2.x;
+        const dy = c1.y - c2.y;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        
+        // Collision threshold (sum of radii)
+        if (distance < (c1.radius + c2.radius)) {
+          // Create explosion at collision point
+          explosions.push({
+            x: (c1.x + c2.x) / 2,
+            y: (c1.y + c2.y) / 2,
+            radius: 10,
+            opacity: 1.0
+          });
+          
+          playExplosionSound();
+          
+          // Remove both contacts
+          contacts.splice(j, 1);
+          contacts.splice(i, 1);
+          
+          // Log collision event
+          addLogEntry(`COLLISION DETECTED! Contacts destroyed at bearing ${Math.round(Math.atan2(dy, dx) * 180/Math.PI)}°.`, 'hostile');
+          
+          // Adjust index since we removed elements
+          j--;
+        }
+      }
+    }
+    
+    // Check torpedo-to-contact collisions
+    for (let t = torpedoes.length - 1; t >= 0; t--) {
+      const torpedo = torpedoes[t];
+      
+      for (let c = contacts.length - 1; c >= 0; c--) {
+        const contact = contacts[c];
+        
+        const dx = torpedo.x - contact.x;
+        const dy = torpedo.y - contact.y;
+        const distance = Math.sqrt(dx*dx + dy*dy);
+        
+        // Torpedo hits contact if close enough
+        if (distance < 15) { // Torpedo radius + contact radius + tolerance
+          explosions.push({
+            x: contact.x,
+            y: contact.y,
+            radius: 20,
+            opacity: 1.0
+          });
+          
+          playExplosionSound();
+          addLogEntry(`HIT! ${contact.id} destroyed by torpedo.`, 'friendly');
+          
+          // Remove contact and torpedo
+          contacts.splice(c, 1);
+          torpedoes.splice(t, 1);
+          break; // Torpedo can only hit one target
+        }
+      }
+    }
+    
+    // Update UI with actual contact count
+    document.getElementById('contactCount').textContent = contacts.length;
+  } catch (e) {
+    console.error('Error checking collisions:', e);
+  }
+}
+
+// Torpedo firing system
+function fireTorpedo(bearing, range) {
+  try {
+    if (isReloading) {
+      addLogEntry('SYSTEM: Torpedoes still reloading. Please wait.', 'system');
+      return;
+    }
+    
+    // Convert bearing from degrees to radians
+    const angle = bearing * Math.PI / 180;
+    
+    // Calculate starting position at submarine center
+    const startX = centerX;
+    const startY = centerY;
+    
+    // Create torpedo object
+    const torpedo = {
+      id: `TORP-${Date.now().toString().slice(-4)}`,
+      x: startX,
+      y: startY,
+      speed: 2.5, // Torpedo speed (pixels per frame)
+      angle: angle,
+      depth: Math.random() * 300 + 100, // Random depth between 100-400m
+      type: 'active',
+      trail: [],
+      opacity: 1.0,
+      active: true,
+      lifetime: 600 // 10 seconds at 60fps
+    };
+    
+    torpedoes.push(torpedo);
+    
+    // Update UI
+    document.getElementById('fireControlStatus').textContent = 'RELOADING';
+    document.getElementById('fireControlStatus').style.color = '#ff8c00';
+    isReloading = true;
+    reloadTimeLeft = 5; // 5 seconds reload time
+    
+    playFireControl();
+    addLogEntry(`TORPEDO FIRED: Bearing ${bearing}°, Target range ${range}nm.`, 'friendly');
+    
+    // Update torpedo status display
+    updateTorpedoStatus();
+  } catch (e) {
+    console.error('Error firing torpedo:', e);
+  }
+}
+
+// Torpedo reload system
+function checkReloadStatus() {
+  try {
+    if (isReloading) {
+      reloadTimeLeft--;
+      
+      const btn = document.getElementById('fireBtn');
+      const status = document.getElementById('reloadTimer');
+      
+      if (reloadTimeLeft > 0) {
+        status.textContent = `${reloadTimeLeft}s`;
+        btn.disabled = true;
+        btn.textContent = `RELOADING... ${reloadTimeLeft}`;
+      } else {
+        isReloading = false;
+        reloadTimeLeft = 0;
+        
+        // Reset UI elements
+        btn.textContent = 'FIRE';
+        btn.disabled = false;
+        status.textContent = 'READY';
+        document.getElementById('fireControlStatus').textContent = 'ARMED';
+        document.getElementById('fireControlStatus').style.color = '#ff2020';
+        
+        addLogEntry('SYSTEM: Torpedoes reloaded and ready.', 'friendly');
+      }
+    }
+  } catch (e) {
+    console.error('Error checking reload status:', e);
+  }
+}
+
+// Update torpedo status display
+function updateTorpedoStatus() {
+  try {
+    // Count active torpedoes vs total capacity
+    const activeCount = torpedoes.filter(t => t.active).length;
+    document.getElementById('torpedoCount').textContent = `${8 - activeCount}/8 READY`;
+    
+    if (isReloading) {
+      document.getElementById('fireControlStatus').textContent = 'RELOADING';
+      document.getElementById('fireControlStatus').style.color = '#ff8c00';
+    } else {
+      document.getElementById('fireControlStatus').textContent = 'ARMED';
+      document.getElementById('fireControlStatus').style.color = '#ff2020';
+    }
+  } catch (e) {
+    console.error('Error updating torpedo status:', e);
+  }
+}
+
+// Draw contacts with trails and authentic radar behavior
+function drawContacts() {
+  try {
+    const trailLength = Math.PI / 6;
+    let sweepStartAngle = sweepAngle - trailLength;
+    let sweepEndAngle = sweepAngle;
+
+    // Filter contacts by depth BEFORE drawing
+    for (let i = contacts.length - 1; i >= 0; i--) {
+      if (contacts[i].depth > maxDepthM) {
+        contacts.splice(i, 1);
+      }
+    }
+
+    contacts.forEach((contact, i) => {
+      // Initialize properties if not present
+      contact.lastInSweep = (typeof contact.lastInSweep === 'undefined') ? false : contact.lastInSweep;
+      contact.undetectedFrames = (typeof contact.undetectedFrames === 'undefined') ? 0 : contact.undetectedFrames;
+
+      // Record current position for trail
+      if (!contact.trail) contact.trail = [];
+      contact.trail.push({ x: contact.x, y: contact.y });
+      if (contact.trail.length > MAX_TRAIL_LENGTH) contact.trail.shift();
+
+      // Move contact with realistic speed
+      let currentSpeed = contact.speed;
+      if (contact.depth > 50) {
+        currentSpeed = Math.max(0.3, Math.min(2.0, contact.speed));
+      } else {
+        currentSpeed = Math.max(0.8, Math.min(4.0, contact.speed));
+      }
+
+      contact.x += Math.cos(contact.angle) * currentSpeed;
+      contact.y += Math.sin(contact.angle) * currentSpeed;
+
+      // Wrap around screen edges
+      if (contact.x < 0) contact.x = canvas.width;
+      if (contact.x > canvas.width) contact.x = 0;
+      if (contact.y < 0) contact.y = canvas.height;
+      if (contact.y > canvas.height) contact.y = 0;
+
+      // Draw trail
+      if (trailsEnabled) {
+        for (let j = 0; j < contact.trail.length; j++) {
+          const pos = contact.trail[j];
+          const alpha = (j / contact.trail.length) * 0.4;
+
+          ctx.fillStyle = contact.color.replace(')', `, ${alpha})`);
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // Calculate distance from center
+      const dx = contact.x - centerX;
+      const dy = contact.y - centerY;
+      const distPx = Math.sqrt(dx*dx + dy*dy);
+      const distNm = distPx / 5;
+
+      // Range filter check (only check minimum range)
+      if (distNm < minRangeNm) {
+        return;
+      }
+
+      // Calculate bearing
+      let angleFromCenter = Math.atan2(dy, dx);
+      if (angleFromCenter < 0) angleFromCenter += Math.PI * 2;
+
+      // Determine if contact is within current sweep arc
+      let inSweep = false;
+      while (sweepStartAngle < 0) sweepStartAngle += Math.PI * 2;
+      while (sweepEndAngle > Math.PI * 2) sweepEndAngle -= Math.PI * 2;
+
+      if (sweepStartAngle <= sweepEndAngle) {
+        inSweep = angleFromCenter >= sweepStartAngle && angleFromCenter <= sweepEndAngle;
+      } else {
+        inSweep = angleFromCenter >= sweepStartAngle || angleFromCenter <= sweepEndAngle;
+      }
+
+      // Sonar ping when sweep first reaches contact
+      if (!contact.lastInSweep && inSweep) {
+        const bearingFromNorth = (Math.PI / 2 - angleFromCenter + Math.PI * 2) % (Math.PI * 2);
+        
+        addGhostBlip(contact, angleFromCenter, distPx);
+        playSonarPing(bearingFromNorth, currentSpeed);
+
+        // Log contact detection
+        if (contact.type === 'hostile') {
+          addLogEntry(`${contact.id} detected at bearing ${Math.round(angleFromCenter * 180/Math.PI)}°.`, 'hostile');
+        } else {
+          addLogEntry(`${contact.id} detected at bearing ${Math.round(angleFromCenter * 180/Math.PI)}°.`, 'friendly');
+        }
+      }
+
+      contact.lastInSweep = inSweep;
+
+      // Handle fade-out
+      if (!inSweep) {
+        contact.undetectedFrames++;
+      } else {
+        contact.undetectedFrames = 0;
+      }
+
+      // Calculate signal strength
+      const angleDiff1 = Math.abs(angleFromCenter - sweepAngle);
+      const angleDiff2 = Math.abs(angleFromCenter - (sweepAngle + Math.PI * 2));
+      const angleDiff3 = Math.abs((angleFromCenter + Math.PI * 2) - sweepAngle);
+      const minAngleDiff = Math.min(angleDiff1, angleDiff2, angleDiff3);
+      const signalStrength = Math.min(minAngleDiff / (trailLength/2), 1);
+
+      // Fade out if undetected
+      let contactAlpha = 1;
+      if (contact.undetectedFrames > 5) {
+        contactAlpha = Math.max(0, 1 - (contact.undetectedFrames - 5) * 0.2);
+      }
+
+      // Draw contact blip
+      ctx.shadowBlur = inSweep ? 8 : 0;
+      ctx.shadowColor = contact.color;
+
+      const baseColor = contact.color.replace(')', `, ${contactAlpha * (1 - signalStrength * 0.3)})`);
+      ctx.fillStyle = baseColor;
+
+      const blipSize = inSweep ? 4 : Math.max(2, 3 - signalStrength);
+
+      ctx.beginPath();
+      ctx.arc(contact.x, contact.y, blipSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Label
+      if (inSweep) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${contactAlpha})`;
+        ctx.font = "11px 'Share Tech Mono'";
+        const rangeNm = Math.round(distPx / 5);
+        const bearingDeg = Math.round(angleFromCenter * (180/Math.PI));
+
+        const depthInfo = contact.depth > 0 ? ` D:${contact.depth}m` : '';
+        ctx.fillText(`${contact.id} R:${rangeNm}nm B:${bearingDeg}${depthInfo}`, contact.x + 10, contact.y - 8);
+      }
+
+      // Update latest contact info
+      if (inSweep) {
+        document.getElementById('latestContactId').textContent = contact.id;
+        document.getElementById('latestBearing').textContent = `${Math.round(angleFromCenter * 180/Math.PI)}°`;
+        document.getElementById('latestRange').textContent = `${rangeNm} nm`;
+        document.getElementById('latestDepth').textContent = `${contact.depth} m`;
+      }
+
+      ctx.shadowBlur = 0;
+    });
+
+    // Draw ghost blips
+    for (let i = ghostBlips.length - 1; i >= 0; i--) {
+      const ghost = ghostBlips[i];
+      ghost.age++;
+      ghost.opacity -= 0.04;
+
+      if (ghost.opacity <= 0 || ghost.age > ghost.maxAge) {
+        ghostBlips.splice(i, 1);
+        continue;
+      }
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${ghost.opacity})`;
+      ctx.beginPath();
+      ctx.arc(ghost.x, ghost.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = `rgba(255, 255, 255, ${ghost.opacity})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(ghost.x, ghost.y);
+      ctx.lineTo(ghost.ghostX, ghost.ghostY);
+      ctx.stroke();
+    }
+    
+    // Update tracked count
+    document.getElementById('trackedCount').textContent = contacts.length;
+  } catch (e) {
+    console.error('Error drawing contacts:', e);
+  }
+}
+
+// Draw radar sweep
+function drawRadarSweep() {
+  try {
+    const radius = Math.hypot(centerX, centerY);
+
+    ctx.globalCompositeOperation = 'lighter';
+
+    const trailLength = Math.PI / 6;
+    let startAngle = sweepAngle - trailLength;
+    const endAngle = sweepAngle;
+
+    if (startAngle < 0) {
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle + Math.PI * 2, Math.PI * 2);
+      ctx.arc(centerX, centerY, radius, 0, endAngle);
+    } else if (endAngle > Math.PI * 2) {
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, Math.PI * 2);
+      ctx.arc(centerX, centerY, radius, 0, endAngle - Math.PI * 2);
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(centerX, centerY);
+      ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+    }
+
+    ctx.closePath();
+
+    const grad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, radius);
+    grad.addColorStop(0, 'rgba(0, 255, 64, 0)');
+    grad.addColorStop(0.3, 'rgba(0, 255, 64, 0.15)');
+    grad.addColorStop(1, 'rgba(0, 255, 64, 0.25)');
+
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Bright leading edge line
+    ctx.beginPath();
+    ctx.moveTo(centerX, centerY);
+    ctx.lineTo(
+      centerX + Math.cos(sweepAngle) * radius,
+      centerY + Math.sin(sweepAngle) * radius
+    );
+    ctx.strokeStyle = 'rgba(0, 255, 64, 1.0)';
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 8;
+    ctx.shadowColor = '#0f0';
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Update sweep angle
+    sweepAngle += SWEEP_SPEED;
+    
+    if (sweepAngle >= Math.PI * 2) {
+      sweepAngle -= Math.PI * 2;
+      playRadarBleep();
+    }
+
+    // Draw sonar waveforms
+    for (let i = sonarWaves.length - 1; i >= 0; i--) {
+      const wave = sonarWaves[i];
+      wave.radius += 3;
+      wave.opacity -= 0.02;
+
+      if (wave.opacity <= 0) {
+        sonarWaves.splice(i, 1);
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.arc(wave.x, wave.y, wave.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(0, 255, 64, ${wave.opacity})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      if (Math.floor(Date.now() / 100) % 3 === 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${wave.opacity})`;
+        ctx.font = "bold 14px 'Share Tech Mono'";
+        ctx.fillText("PING!", wave.x - 18, wave.y + 4);
+      }
+    }
+
+    // Draw echo rings
+    for (let i = echoRings.length - 1; i >= 0; i--) {
+      const ring = echoRings[i];
+      ring.radius += 8;
+      ring.opacity -= 0.05;
+
+      if (ring.opacity <= 0 || ring.radius > ring.maxRadius) {
+        echoRings.splice(i, 1);
+        continue;
+      }
+
+      ctx.beginPath();
+      ctx.arc(ring.x, ring.y, ring.radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(0, 255, 64, ${ring.opacity})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      if (Math.floor(Date.now() / 50) % 4 === 0) {
+        ctx.fillStyle = `rgba(255, 255, 255, ${ring.opacity})`;
+        ctx.font = "10px 'Share Tech Mono'";
+        const rangeNm = Math.round(ring.radius / 8);
+        ctx.fillText(`ECHO ${rangeNm}nm`, ring.x - 15, ring.y + 3);
+      }
+    }
+
+    // Draw center hub
+    ctx.fillStyle = "#0a3a0a";
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, 25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Crosshair lines
+    ctx.strokeStyle = "rgba(0, 255, 64, 0.3)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(centerX - 30, centerY);
+    ctx.lineTo(centerX + 30, centerY);
+    ctx.moveTo(centerX, centerY - 30);
+    ctx.lineTo(centerX, centerY + 30);
+    ctx.stroke();
+
+    // Range rings
+    for (let r = 150; r < radius; r += 150) {
+      const nm = Math.round(r / 5);
+
+      ctx.strokeStyle = "rgba(0, 255, 64, 0.15)";
+      ctx.beginPath();
+      ctx.arc(centerX, centerY, r, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = "#afa";
+      ctx.font = "bold 12px 'Share Tech Mono'";
+      ctx.textAlign = "center";
+      ctx.fillText(`${nm}nm`, centerX + r - 15, centerY - 3);
+    }
+
+    // Direction indicators
+    ctx.fillStyle = "#afa";
+    ctx.font = "bold 14px 'Share Tech Mono'";
+    
+    const radiusOffset = radius + 20;
+    ctx.textAlign = "center";
+    ctx.fillText("N", centerX, centerY - radiusOffset);
+    ctx.fillText("S", centerX, centerY + radiusOffset);
+    ctx.textAlign = "right";
+    ctx.fillText("W", centerX - radiusOffset, centerY + 4);
+    ctx.textAlign = "left";
+    ctx.fillText("E", centerX + radiusOffset, centerY + 4);
+  } catch (e) {
+    console.error('Error drawing radar sweep:', e);
+  }
+}
+
+// Update ship status readouts
+function updateShipStatus() {
+  try {
+    // Randomize for demo purposes (real subs would use actual sensor data)
+    const depth = Math.floor(Math.random() * 300) + 150;
+    const speed = (Math.random() * 8 + 2).toFixed(1);
+    const heading = Math.floor(Math.random() * 360);
+    
+    document.getElementById('depthReadout').textContent = `${depth}m`;
+    document.getElementById('speedReadout').textContent = `${speed} kts`;
+    document.getElementById('headingReadout').textContent = `${heading.toString().padStart(3, '0')}°`;
+  } catch (e) {
+    console.error('Error updating ship status:', e);
+  }
+}
+
+// Update game state display
+function updateGameStateDisplay() {
+  try {
+    const badge = document.getElementById('gameStateBadge');
+    
+    // Remove existing class and add current state class
+    badge.className = 'game-state-badge';
+    badge.classList.add(gameState.toLowerCase());
+    
+    badge.textContent = `${gameState} MODE`;
+    
+    // Update colors based on state
+    switch (gameState) {
+      case GAME_STATE.COMBAT:
+        document.documentElement.style.setProperty('--phosphor-green', '#00ff41');
+        break;
+      case GAME_STATE.ALERT:
+        document.documentElement.style.setProperty('--phosphor-green', '#ffff00');
+        break;
+      default:
+        document.documentElement.style.setProperty('--phosphor-green', '#00ff41');
+    }
+  } catch (e) {
+    console.error('Error updating game state display:', e);
+  }
+}
+
+// Update clock
+function updateClock() {
+  try {
+    const now = new Date();
+    const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}Z`;
+    
+    document.getElementById('utcClock').textContent = utcTime;
+
+    // Update mission timer
+    const elapsed = performance.now() - missionStartTime;
+    const hours = Math.floor(elapsed / 3600000);
+    const minutes = Math.floor((elapsed % 3600000) / 60000);
+    const seconds = Math.floor((elapsed % 60000) / 1000);
+    
+    document.getElementById('missionTimer').textContent = 
+      `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  } catch (e) {
+    console.error('Error updating clock:', e);
+  }
+}
+
+// Update coordinate display
+function updateCoordinateDisplay() {
+  if (mouseX !== null && mouseY !== null) {
+    const dx = mouseX - centerX;
+    const dy = mouseY - centerY;
+    
+    // Calculate bearing in degrees (0-359)
+    let bearingRad = Math.atan2(dy, dx);
+    if (bearingRad < 0) bearingRad += Math.PI * 2;
+    const bearingDeg = Math.round(bearingRad * 180 / Math.PI);
+    
+    // Calculate range in nautical miles
+    const distPx = Math.sqrt(dx*dx + dy*dy);
+    const rangeNm = Math.round(distPx / 5);
+    
+    document.getElementById('currentBearing').textContent = `${bearingDeg.toString().padStart(3, '0')}°`;
+    document.getElementById('currentRange').textContent = `${rangeNm} nm`;
+  } else {
+    document.getElementById('currentBearing').textContent = '--°';
+    document.getElementById('currentRange').textContent = '-- nm';
+  }
+}
+
+// Update acoustic environment data
+function updateAcousticData() {
+  try {
+    const noiseFloor = -45 + Math.floor(Math.random() * 10);
+    const waterTemp = 18 + Math.floor(Math.random() * 4);
+    
+    document.getElementById('noiseFloor').textContent = `${noiseFloor} dB`;
+    document.getElementById('waterTemp').textContent = `${waterTemp}°C at 200m`;
+  } catch (e) {
+    console.error('Error updating acoustic data:', e);
+  }
+}
+
+// Main render loop
+function animate() {
+  try {
+    const now = performance.now();
+    frameCount++;
+
+    if (now - lastTime >= 1000) {
+      fps = Math.round((frameCount * 1000) / (now - lastTime));
+      document.getElementById('fpsDisplay').textContent = fps;
+      document.getElementById('contactCount').textContent = contacts.length;
+      
+      updateShipStatus();
+      updateAcousticData();
+      
+      frameCount = 0;
+      lastTime = now;
+    }
+
+    // Update clock every second
+    if (now - lastUtcUpdate >= 1000) {
+      updateClock();
+      lastUtcUpdate = now;
+    }
+
+    // Check reload status
+    checkReloadStatus();
+
+    // Game state management
+    const elapsedGameState = now - lastStateChange;
+    
+    // Simple game state transitions based on time and user actions
+    if (gameState === GAME_STATE.PATROL && contacts.length > 5) {
+      gameState = GAME_STATE.COMBAT;
+      addLogEntry('SYSTEM: Combat mode activated due to increased contact density.', 'system');
+      lastStateChange = now;
+    }
+    
+    if (gameState === GAME_STATE.COMBAT && elapsedGameState > 30000) { // 30 seconds in combat
+      gameState = GAME_STATE.ALERT;
+      addLogEntry('SYSTEM: Alert mode - maximum readiness required.', 'system');
+      lastStateChange = now;
+    }
+    
+    updateGameStateDisplay();
+
+    // Clear canvas with slight fade for motion blur
+    ctx.fillStyle = "rgba(10, 26, 42, 0.3)";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawBackground();
+    
+    if (mouseX !== null && mouseY !== null) {
+      updateCoordinateDisplay();
+      drawCoordinateCrosshair();
+    }
+    
+    // Draw animation effects
+    drawAnimationEffects();
+    
+    // Check for collisions before drawing contacts
+    checkCollisions();
+    
+    // Draw contacts and radar sweep
+    drawContacts();
+    drawRadarSweep();
+    
+    requestAnimationFrame(animate);
+  } catch (e) {
+    console.error('Error in animate loop:', e);
+  }
+}
+
+// Add event listeners for mouse movement
+canvas.addEventListener('mousemove', (e) => {
+  const rect = canvas.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mouseleave', () => {
+  mouseX = null;
+  mouseY = null;
+});
+
+// Event handlers for interactive elements
+function setupEventListeners() {
+  try {
+    // Depth slider
+    const depthSlider = document.getElementById('depthSlider');
+    depthSlider.addEventListener('input', (e) => {
+      maxDepthM = parseInt(e.target.value);
+      addLogEntry(`SYSTEM: Depth filter set to ${maxDepthM}m`, 'system');
+    });
+
+    // Range slider
+    const rangeSlider = document.getElementById('rangeSlider');
+    rangeSlider.addEventListener('input', (e) => {
+      minRangeNm = parseInt(e.target.value);
+      addLogEntry(`SYSTEM: Minimum range filter set to ${minRangeNm}nm`, 'system');
+    });
+
+    // Torpedo tube buttons
+    const tubeButtons = document.querySelectorAll('.tube-btn');
+    tubeButtons.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const tubeNum = e.target.closest('button').getAttribute('data-tube');
+        if (btn.classList.contains('ready')) {
+          btn.classList.remove('ready');
+          btn.classList.add('armed');
+          btn.innerHTML = `<span>TUBE ${tubeNum}<br>ARMED</span>`;
+          addLogEntry(`SYSTEM: Tube ${tubeNum} weapons armed.`, 'system');
+        } else if (btn.classList.contains('armed')) {
+          btn.classList.remove('armed');
+          btn.innerHTML = `<span>TUBE ${tubeNum}<br>READY</span>`;
+          btn.classList.add('ready');
+          addLogEntry(`SYSTEM: Tube ${tubeNum} weapons safe.`, 'system');
+        }
+      });
+    });
+
+    // Fire control button
+    const fireControlBtn = document.getElementById('fireControlBtn');
+    fireControlBtn.addEventListener('click', () => {
+      if (!isReloading) {
+        playFireControl();
+        addLogEntry(`SYSTEM: Fire control engaged.`, 'system');
+        
+        // Change state to combat when firing
+        if (gameState === GAME_STATE.PATROL) {
+          gameState = GAME_STATE.COMBAT;
+          lastStateChange = performance.now();
+        }
+      } else {
+        addLogEntry('SYSTEM: Weapons reloading. Please wait.', 'system');
+      }
+    });
+
+    // Fire button
+    const fireBtn = document.getElementById('fireBtn');
+    fireBtn.addEventListener('click', () => {
+      if (isReloading) {
+        addLogEntry('SYSTEM: Torpedoes still reloading. Please wait.', 'system');
+        return;
+      }
+
+      const bearingInput = document.getElementById('targetBearing');
+      const rangeInput = document.getElementById('targetRange');
+
+      let bearing = parseInt(bearingInput.value) || 0;
+      let range = parseInt(rangeInput.value) || 20;
+
+      // Validate inputs
+      if (bearing < 0) bearing = 0;
+      if (bearing > 359) bearing = 359;
+      if (range < 1) range = 1;
+      if (range > 70) range = 70;
+
+      fireTorpedo(bearing, range);
+    });
+
+    // LED toggles
+    const sonarToggle = document.getElementById('sonarToggle');
+    sonarToggle.addEventListener('click', () => {
+      sonarActive = !sonarActive;
+      document.getElementById('sonarLed').classList.toggle('active', sonarActive);
+      
+      if (sonarActive) {
+        addLogEntry('SYSTEM: Sonar array activated.', 'system');
+      } else {
+        addLogEntry('SYSTEM: Sonar array passive mode.', 'system');
+      }
+    });
+
+    const ghostToggle = document.getElementById('ghostToggle');
+    ghostToggle.addEventListener('click', () => {
+      ghostEchoesEnabled = !ghostEchoesEnabled;
+      document.getElementById('ghostLed').classList.toggle('active', ghostEchoesEnabled);
+      
+      if (ghostEchoesEnabled) {
+        addLogEntry('SYSTEM: Ghost echo filtering enabled.', 'system');
+      } else {
+        addLogEntry('SYSTEM: Ghost echo filtering disabled.', 'system');
+      }
+    });
+
+    const trailToggle = document.getElementById('trailToggle');
+    trailToggle.addEventListener('click', () => {
+      trailsEnabled = !trailsEnabled;
+      document.getElementById('trailLed').classList.toggle('active', trailsEnabled);
+      
+      if (trailsEnabled) {
+        addLogEntry('SYSTEM: Contact trails enabled.', 'system');
+      } else {
+        addLogEntry('SYSTEM: Contact trails disabled.', 'system');
+      }
+    });
+
+    // Input field validation
+    document.getElementById('targetBearing').addEventListener('change', (e) => {
+      let value = parseInt(e.target.value);
+      if (value < 0) e.target.value = 0;
+      if (value > 359) e.target.value = 359;
+    });
+
+    document.getElementById('targetRange').addEventListener('change', (e) => {
+      let value = parseInt(e.target.value);
+      if (value < 1) e.target.value = 1;
+      if (value > 70) e.target.value = 70;
+    });
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      switch(e.key.toLowerCase()) {
+        case 'f':
+          fireBtn.click();
+          break;
+        case 's':
+          sonarToggle.click();
+          break;
+        case 'g':
+          ghostToggle.click();
+          break;
+        case 't':
+          trailToggle.click();
+          break;
+        case '1':
+        case '2':
+        case '3':
+        case '4':
+        case '5':
+        case '6':
+        case '7':
+        case '8':
+          const tubeNum = parseInt(e.key);
+          if (tubeButtons[tubeNum - 1]) {
+            tubeButtons[tubeNum - 1].click();
+          }
+          break;
+      }
+    });
+  } catch (e) {
+    console.error('Error setting up event listeners:', e);
+  }
+}
+
+// Initialize event listeners after DOM is loaded
+document.addEventListener('DOMContentLoaded', setupEventListeners);
+
+// Start the animation loop
+animate();
+</script>
+</body>
+</html>
