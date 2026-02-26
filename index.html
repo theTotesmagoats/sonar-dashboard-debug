@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SSN Virginia-class Submarine Sonar Dashboard - Enhanced Simulation</title>
+  <title>SSN Virginia-class Submarine Sonar Dashboard - Enhanced Simulation (Fixed)</title>
   
   <!-- Google Fonts Import -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -748,6 +748,7 @@ let fps = 60;
 // Filter settings (in nm, scale: 5px = 1nm)
 let minRangeNm = 5;
 let maxDepthM = 300;
+const MAX_RANGE_NM = 120; // Add maximum range filter
 
 // Toggle states
 let sonarActive = true;
@@ -1136,7 +1137,7 @@ function drawCoordinateCrosshair() {
   }
 }
 
-// Animation effect rendering
+// Animation effect rendering - FIXED: Added explosion collision detection
 function drawAnimationEffects() {
   // Draw explosion effects (expanding orange/red circles)
   for (let i = explosions.length - 1; i >= 0; i--) {
@@ -1159,18 +1160,37 @@ function drawAnimationEffects() {
     ctx.arc(effect.x, effect.y, effect.radius * 0.7, 0, Math.PI * 2);
     ctx.fill();
     
+    // Check for contact collisions with explosion (FIXED)
+    for (let c = contacts.length - 1; c >= 0; c--) {
+      const contact = contacts[c];
+      const dx = effect.x - contact.x;
+      const dy = effect.y - contact.y;
+      const distance = Math.sqrt(dx*dx + dy*dy);
+      
+      // If explosion radius overlaps with contact, destroy it
+      if (distance < effect.radius + contact.radius) {
+        playExplosionSound();
+        addLogEntry(`HIT! ${contact.id} destroyed by explosion.`, 'friendly');
+        contacts.splice(c, 1);
+      }
+    }
+    
     effect.radius += 4;
     effect.opacity -= 0.015; // Fade over ~1.5 seconds (100 frames at 60fps)
   }
   
-  // Draw torpedoes
+  // Draw torpedoes - FIXED: Added lifetime enforcement
   for (let i = torpedoes.length - 1; i >= 0; i--) {
     const torpedo = torpedoes[i];
     
-    if (!torpedo.active) {
+    // FIXED: Check torpedo lifetime
+    if (!torpedo.active || torpedo.lifetime <= 0) {
       torpedoes.splice(i, 1);
       continue;
     }
+    
+    // Decrement lifetime (FIXED)
+    torpedo.lifetime--;
     
     // Update torpedo position
     torpedo.x += Math.cos(torpedo.angle) * torpedo.speed;
@@ -1211,34 +1231,9 @@ function drawAnimationEffects() {
     
     ctx.shadowBlur = 0;
   }
-  
-  // Draw explosion effects
-  for (let i = explosions.length - 1; i >= 0; i--) {
-    const effect = explosions[i];
-    
-    if (effect.opacity <= 0) {
-      explosions.splice(i, 1);
-      continue;
-    }
-    
-    ctx.strokeStyle = `rgba(255, 69, 0, ${effect.opacity})`;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(effect.x, effect.y, effect.radius, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    // Inner circle for explosion effect
-    ctx.fillStyle = `rgba(255, 165, 0, ${effect.opacity * 0.3})`;
-    ctx.beginPath();
-    ctx.arc(effect.x, effect.y, effect.radius * 0.7, 0, Math.PI * 2);
-    ctx.fill();
-    
-    effect.radius += 4;
-    effect.opacity -= 0.015; // Fade over ~1.5 seconds (100 frames at 60fps)
-  }
 }
 
-// Collision detection function
+// Collision detection function - FIXED: Improved explosion collision logic
 function checkCollisions() {
   try {
     // Check contact-to-contact collisions
@@ -1308,13 +1303,15 @@ function checkCollisions() {
     }
     
     // Update UI with actual contact count
-    document.getElementById('contactCount').textContent = contacts.length;
+    if (document.getElementById('contactCount')) {
+      document.getElementById('contactCount').textContent = contacts.length;
+    }
   } catch (e) {
     console.error('Error checking collisions:', e);
   }
 }
 
-// Torpedo firing system
+// Torpedo firing system - FIXED: Improved torpedo creation
 function fireTorpedo(bearing, range) {
   try {
     if (isReloading) {
@@ -1329,7 +1326,7 @@ function fireTorpedo(bearing, range) {
     const startX = centerX;
     const startY = centerY;
     
-    // Create torpedo object
+    // Create torpedo object - FIXED: Added lifetime property and proper initialization
     const torpedo = {
       id: `TORP-${Date.now().toString().slice(-4)}`,
       x: startX,
@@ -1341,14 +1338,16 @@ function fireTorpedo(bearing, range) {
       trail: [],
       opacity: 1.0,
       active: true,
-      lifetime: 600 // 10 seconds at 60fps
+      lifetime: 600 // 10 seconds at 60fps - FIXED: Now enforced
     };
     
     torpedoes.push(torpedo);
     
     // Update UI
-    document.getElementById('fireControlStatus').textContent = 'RELOADING';
-    document.getElementById('fireControlStatus').style.color = '#ff8c00';
+    if (document.getElementById('fireControlStatus')) {
+      document.getElementById('fireControlStatus').textContent = 'RELOADING';
+      document.getElementById('fireControlStatus').style.color = '#ff8c00';
+    }
     isReloading = true;
     reloadTimeLeft = 5; // 5 seconds reload time
     
@@ -1371,11 +1370,11 @@ function checkReloadStatus() {
       const btn = document.getElementById('fireBtn');
       const status = document.getElementById('reloadTimer');
       
-      if (reloadTimeLeft > 0) {
+      if (reloadTimeLeft > 0 && btn && status) {
         status.textContent = `${reloadTimeLeft}s`;
         btn.disabled = true;
         btn.textContent = `RELOADING... ${reloadTimeLeft}`;
-      } else {
+      } else if (btn && status) {
         isReloading = false;
         reloadTimeLeft = 0;
         
@@ -1383,8 +1382,10 @@ function checkReloadStatus() {
         btn.textContent = 'FIRE';
         btn.disabled = false;
         status.textContent = 'READY';
-        document.getElementById('fireControlStatus').textContent = 'ARMED';
-        document.getElementById('fireControlStatus').style.color = '#ff2020';
+        if (document.getElementById('fireControlStatus')) {
+          document.getElementById('fireControlStatus').textContent = 'ARMED';
+          document.getElementById('fireControlStatus').style.color = '#ff2020';
+        }
         
         addLogEntry('SYSTEM: Torpedoes reloaded and ready.', 'friendly');
       }
@@ -1397,30 +1398,37 @@ function checkReloadStatus() {
 // Update torpedo status display
 function updateTorpedoStatus() {
   try {
-    // Count active torpedoes vs total capacity
-    const activeCount = torpedoes.filter(t => t.active).length;
-    document.getElementById('torpedoCount').textContent = `${8 - activeCount}/8 READY`;
+    // Count active torpedoes vs total capacity - FIXED: Added safety check
+    const activeCount = torpedoes ? torpedoes.filter(t => t.active).length : 0;
+    
+    if (document.getElementById('torpedoCount')) {
+      document.getElementById('torpedoCount').textContent = `${8 - activeCount}/8 READY`;
+    }
     
     if (isReloading) {
-      document.getElementById('fireControlStatus').textContent = 'RELOADING';
-      document.getElementById('fireControlStatus').style.color = '#ff8c00';
+      if (document.getElementById('fireControlStatus')) {
+        document.getElementById('fireControlStatus').textContent = 'RELOADING';
+        document.getElementById('fireControlStatus').style.color = '#ff8c00';
+      }
     } else {
-      document.getElementById('fireControlStatus').textContent = 'ARMED';
-      document.getElementById('fireControlStatus').style.color = '#ff2020';
+      if (document.getElementById('fireControlStatus')) {
+        document.getElementById('fireControlStatus').textContent = 'ARMED';
+        document.getElementById('fireControlStatus').style.color = '#ff2020';
+      }
     }
   } catch (e) {
     console.error('Error updating torpedo status:', e);
   }
 }
 
-// Draw contacts with trails and authentic radar behavior
+// Draw contacts with trails and authentic radar behavior - FIXED: Multiple fixes
 function drawContacts() {
   try {
     const trailLength = Math.PI / 6;
     let sweepStartAngle = sweepAngle - trailLength;
     let sweepEndAngle = sweepAngle;
 
-    // Filter contacts by depth BEFORE drawing
+    // Filter contacts by depth BEFORE drawing - FIXED: Pre-filter at creation time would be better
     for (let i = contacts.length - 1; i >= 0; i--) {
       if (contacts[i].depth > maxDepthM) {
         contacts.splice(i, 1);
@@ -1454,13 +1462,19 @@ function drawContacts() {
       if (contact.y < 0) contact.y = canvas.height;
       if (contact.y > canvas.height) contact.y = 0;
 
-      // Draw trail
-      if (trailsEnabled) {
+      // Draw trail - FIXED: Safe color replacement
+      if (trailsEnabled && contact.trail) {
         for (let j = 0; j < contact.trail.length; j++) {
           const pos = contact.trail[j];
           const alpha = (j / contact.trail.length) * 0.4;
 
-          ctx.fillStyle = contact.color.replace(')', `, ${alpha})`);
+          // FIXED: Safe color replacement - check if color contains ')' before replacing
+          let trailColor = contact.color;
+          if (contact.color.includes(')')) {
+            trailColor = contact.color.replace(')', `, ${alpha})`);
+          }
+          
+          ctx.fillStyle = trailColor + (contact.color.includes(')') ? '' : `30`); // Add alpha for hex colors
           ctx.beginPath();
           ctx.arc(pos.x, pos.y, 2, 0, Math.PI * 2);
           ctx.fill();
@@ -1475,6 +1489,11 @@ function drawContacts() {
 
       // Range filter check (only check minimum range)
       if (distNm < minRangeNm) {
+        return;
+      }
+
+      // FIXED: Add maximum range filter
+      if (distNm > MAX_RANGE_NM) {
         return;
       }
 
@@ -1534,7 +1553,18 @@ function drawContacts() {
       ctx.shadowBlur = inSweep ? 8 : 0;
       ctx.shadowColor = contact.color;
 
-      const baseColor = contact.color.replace(')', `, ${contactAlpha * (1 - signalStrength * 0.3)})`);
+      // FIXED: Safe color replacement for main contact color too
+      let baseColor = contact.color;
+      if (contact.color.includes(')')) {
+        baseColor = contact.color.replace(')', `, ${contactAlpha * (1 - signalStrength * 0.3)})`);
+      } else {
+        // For hex colors, we need to convert to rgba format for alpha
+        const r = parseInt(contact.color.substring(1, 3), 16);
+        const g = parseInt(contact.color.substring(3, 5), 16);
+        const b = parseInt(contact.color.substring(5, 7), 16);
+        baseColor = `rgba(${r}, ${g}, ${b}, ${contactAlpha * (1 - signalStrength * 0.3)})`;
+      }
+      
       ctx.fillStyle = baseColor;
 
       const blipSize = inSweep ? 4 : Math.max(2, 3 - signalStrength);
@@ -1556,10 +1586,10 @@ function drawContacts() {
 
       // Update latest contact info
       if (inSweep) {
-        document.getElementById('latestContactId').textContent = contact.id;
-        document.getElementById('latestBearing').textContent = `${Math.round(angleFromCenter * 180/Math.PI)}°`;
-        document.getElementById('latestRange').textContent = `${rangeNm} nm`;
-        document.getElementById('latestDepth').textContent = `${contact.depth} m`;
+        if (document.getElementById('latestContactId')) document.getElementById('latestContactId').textContent = contact.id;
+        if (document.getElementById('latestBearing')) document.getElementById('latestBearing').textContent = `${Math.round(angleFromCenter * 180/Math.PI)}°`;
+        if (document.getElementById('latestRange')) document.getElementById('latestRange').textContent = `${rangeNm} nm`;
+        if (document.getElementById('latestDepth')) document.getElementById('latestDepth').textContent = `${contact.depth} m`;
       }
 
       ctx.shadowBlur = 0;
@@ -1589,8 +1619,10 @@ function drawContacts() {
       ctx.stroke();
     }
     
-    // Update tracked count
-    document.getElementById('trackedCount').textContent = contacts.length;
+    // Update tracked count - FIXED: Added safety check
+    if (document.getElementById('trackedCount')) {
+      document.getElementById('trackedCount').textContent = contacts.length;
+    }
   } catch (e) {
     console.error('Error drawing contacts:', e);
   }
@@ -1762,9 +1794,9 @@ function updateShipStatus() {
     const speed = (Math.random() * 8 + 2).toFixed(1);
     const heading = Math.floor(Math.random() * 360);
     
-    document.getElementById('depthReadout').textContent = `${depth}m`;
-    document.getElementById('speedReadout').textContent = `${speed} kts`;
-    document.getElementById('headingReadout').textContent = `${heading.toString().padStart(3, '0')}°`;
+    if (document.getElementById('depthReadout')) document.getElementById('depthReadout').textContent = `${depth}m`;
+    if (document.getElementById('speedReadout')) document.getElementById('speedReadout').textContent = `${speed} kts`;
+    if (document.getElementById('headingReadout')) document.getElementById('headingReadout').textContent = `${heading.toString().padStart(3, '0')}°`;
   } catch (e) {
     console.error('Error updating ship status:', e);
   }
@@ -1774,6 +1806,8 @@ function updateShipStatus() {
 function updateGameStateDisplay() {
   try {
     const badge = document.getElementById('gameStateBadge');
+    
+    if (!badge) return;
     
     // Remove existing class and add current state class
     badge.className = 'game-state-badge';
@@ -1803,7 +1837,7 @@ function updateClock() {
     const now = new Date();
     const utcTime = `${String(now.getUTCHours()).padStart(2, '0')}:${String(now.getUTCMinutes()).padStart(2, '0')}:${String(now.getUTCSeconds()).padStart(2, '0')}Z`;
     
-    document.getElementById('utcClock').textContent = utcTime;
+    if (document.getElementById('utcClock')) document.getElementById('utcClock').textContent = utcTime;
 
     // Update mission timer
     const elapsed = performance.now() - missionStartTime;
@@ -1811,14 +1845,16 @@ function updateClock() {
     const minutes = Math.floor((elapsed % 3600000) / 60000);
     const seconds = Math.floor((elapsed % 60000) / 1000);
     
-    document.getElementById('missionTimer').textContent = 
-      `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    if (document.getElementById('missionTimer')) {
+      document.getElementById('missionTimer').textContent = 
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
   } catch (e) {
     console.error('Error updating clock:', e);
   }
 }
 
-// Update coordinate display
+// Update coordinate display - FIXED: Added null checks
 function updateCoordinateDisplay() {
   if (mouseX !== null && mouseY !== null) {
     const dx = mouseX - centerX;
@@ -1833,11 +1869,11 @@ function updateCoordinateDisplay() {
     const distPx = Math.sqrt(dx*dx + dy*dy);
     const rangeNm = Math.round(distPx / 5);
     
-    document.getElementById('currentBearing').textContent = `${bearingDeg.toString().padStart(3, '0')}°`;
-    document.getElementById('currentRange').textContent = `${rangeNm} nm`;
+    if (document.getElementById('currentBearing')) document.getElementById('currentBearing').textContent = `${bearingDeg.toString().padStart(3, '0')}°`;
+    if (document.getElementById('currentRange')) document.getElementById('currentRange').textContent = `${rangeNm} nm`;
   } else {
-    document.getElementById('currentBearing').textContent = '--°';
-    document.getElementById('currentRange').textContent = '-- nm';
+    if (document.getElementById('currentBearing')) document.getElementById('currentBearing').textContent = '--°';
+    if (document.getElementById('currentRange')) document.getElementById('currentRange').textContent = '-- nm';
   }
 }
 
@@ -1847,23 +1883,26 @@ function updateAcousticData() {
     const noiseFloor = -45 + Math.floor(Math.random() * 10);
     const waterTemp = 18 + Math.floor(Math.random() * 4);
     
-    document.getElementById('noiseFloor').textContent = `${noiseFloor} dB`;
-    document.getElementById('waterTemp').textContent = `${waterTemp}°C at 200m`;
+    if (document.getElementById('noiseFloor')) document.getElementById('noiseFloor').textContent = `${noiseFloor} dB`;
+    if (document.getElementById('waterTemp')) document.getElementById('waterTemp').textContent = `${waterTemp}°C at 200m`;
   } catch (e) {
     console.error('Error updating acoustic data:', e);
   }
 }
 
-// Main render loop
+// Main render loop - FIXED: Improved frame handling
 function animate() {
   try {
     const now = performance.now();
     frameCount++;
 
     if (now - lastTime >= 1000) {
-      fps = Math.round((frameCount * 1000) / (now - lastTime));
-      document.getElementById('fpsDisplay').textContent = fps;
-      document.getElementById('contactCount').textContent = contacts.length;
+      // FIXED: Better FPS calculation with safety checks
+      const timeDiff = now - lastTime;
+      fps = Math.round((frameCount * 1000) / Math.max(1, timeDiff));
+      
+      if (document.getElementById('fpsDisplay')) document.getElementById('fpsDisplay').textContent = fps;
+      if (document.getElementById('contactCount')) document.getElementById('contactCount').textContent = contacts.length;
       
       updateShipStatus();
       updateAcousticData();
@@ -1943,17 +1982,21 @@ function setupEventListeners() {
   try {
     // Depth slider
     const depthSlider = document.getElementById('depthSlider');
-    depthSlider.addEventListener('input', (e) => {
-      maxDepthM = parseInt(e.target.value);
-      addLogEntry(`SYSTEM: Depth filter set to ${maxDepthM}m`, 'system');
-    });
+    if (depthSlider) {
+      depthSlider.addEventListener('input', (e) => {
+        maxDepthM = parseInt(e.target.value);
+        addLogEntry(`SYSTEM: Depth filter set to ${maxDepthM}m`, 'system');
+      });
+    }
 
     // Range slider
     const rangeSlider = document.getElementById('rangeSlider');
-    rangeSlider.addEventListener('input', (e) => {
-      minRangeNm = parseInt(e.target.value);
-      addLogEntry(`SYSTEM: Minimum range filter set to ${minRangeNm}nm`, 'system');
-    });
+    if (rangeSlider) {
+      rangeSlider.addEventListener('input', (e) => {
+        minRangeNm = parseInt(e.target.value);
+        addLogEntry(`SYSTEM: Minimum range filter set to ${minRangeNm}nm`, 'system');
+      });
+    }
 
     // Torpedo tube buttons
     const tubeButtons = document.querySelectorAll('.tube-btn');
@@ -1976,108 +2019,127 @@ function setupEventListeners() {
 
     // Fire control button
     const fireControlBtn = document.getElementById('fireControlBtn');
-    fireControlBtn.addEventListener('click', () => {
-      if (!isReloading) {
-        playFireControl();
-        addLogEntry(`SYSTEM: Fire control engaged.`, 'system');
-        
-        // Change state to combat when firing
-        if (gameState === GAME_STATE.PATROL) {
-          gameState = GAME_STATE.COMBAT;
-          lastStateChange = performance.now();
+    if (fireControlBtn) {
+      fireControlBtn.addEventListener('click', () => {
+        if (!isReloading) {
+          playFireControl();
+          addLogEntry(`SYSTEM: Fire control engaged.`, 'system');
+          
+          // Change state to combat when firing
+          if (gameState === GAME_STATE.PATROL) {
+            gameState = GAME_STATE.COMBAT;
+            lastStateChange = performance.now();
+          }
+        } else {
+          addLogEntry('SYSTEM: Weapons reloading. Please wait.', 'system');
         }
-      } else {
-        addLogEntry('SYSTEM: Weapons reloading. Please wait.', 'system');
-      }
-    });
+      });
+    }
 
     // Fire button
     const fireBtn = document.getElementById('fireBtn');
-    fireBtn.addEventListener('click', () => {
-      if (isReloading) {
-        addLogEntry('SYSTEM: Torpedoes still reloading. Please wait.', 'system');
-        return;
-      }
+    if (fireBtn) {
+      fireBtn.addEventListener('click', () => {
+        if (isReloading) {
+          addLogEntry('SYSTEM: Torpedoes still reloading. Please wait.', 'system');
+          return;
+        }
 
-      const bearingInput = document.getElementById('targetBearing');
-      const rangeInput = document.getElementById('targetRange');
+        const bearingInput = document.getElementById('targetBearing');
+        const rangeInput = document.getElementById('targetRange');
 
-      let bearing = parseInt(bearingInput.value) || 0;
-      let range = parseInt(rangeInput.value) || 20;
+        let bearing = parseInt(bearingInput?.value || 0);
+        let range = parseInt(rangeInput?.value || 20);
 
-      // Validate inputs
-      if (bearing < 0) bearing = 0;
-      if (bearing > 359) bearing = 359;
-      if (range < 1) range = 1;
-      if (range > 70) range = 70;
+        // Validate inputs
+        if (bearing < 0) bearing = 0;
+        if (bearing > 359) bearing = 359;
+        if (range < 1) range = 1;
+        if (range > 70) range = 70;
 
-      fireTorpedo(bearing, range);
-    });
+        fireTorpedo(bearing, range);
+      });
+    }
 
     // LED toggles
     const sonarToggle = document.getElementById('sonarToggle');
-    sonarToggle.addEventListener('click', () => {
-      sonarActive = !sonarActive;
-      document.getElementById('sonarLed').classList.toggle('active', sonarActive);
-      
-      if (sonarActive) {
-        addLogEntry('SYSTEM: Sonar array activated.', 'system');
-      } else {
-        addLogEntry('SYSTEM: Sonar array passive mode.', 'system');
-      }
-    });
+    if (sonarToggle) {
+      sonarToggle.addEventListener('click', () => {
+        sonarActive = !sonarActive;
+        const led = document.getElementById('sonarLed');
+        if (led) led.classList.toggle('active', sonarActive);
+        
+        if (sonarActive) {
+          addLogEntry('SYSTEM: Sonar array activated.', 'system');
+        } else {
+          addLogEntry('SYSTEM: Sonar array passive mode.', 'system');
+        }
+      });
+    }
 
     const ghostToggle = document.getElementById('ghostToggle');
-    ghostToggle.addEventListener('click', () => {
-      ghostEchoesEnabled = !ghostEchoesEnabled;
-      document.getElementById('ghostLed').classList.toggle('active', ghostEchoesEnabled);
-      
-      if (ghostEchoesEnabled) {
-        addLogEntry('SYSTEM: Ghost echo filtering enabled.', 'system');
-      } else {
-        addLogEntry('SYSTEM: Ghost echo filtering disabled.', 'system');
-      }
-    });
+    if (ghostToggle) {
+      ghostToggle.addEventListener('click', () => {
+        ghostEchoesEnabled = !ghostEchoesEnabled;
+        const led = document.getElementById('ghostLed');
+        if (led) led.classList.toggle('active', ghostEchoesEnabled);
+        
+        if (ghostEchoesEnabled) {
+          addLogEntry('SYSTEM: Ghost echo filtering enabled.', 'system');
+        } else {
+          addLogEntry('SYSTEM: Ghost echo filtering disabled.', 'system');
+        }
+      });
+    }
 
     const trailToggle = document.getElementById('trailToggle');
-    trailToggle.addEventListener('click', () => {
-      trailsEnabled = !trailsEnabled;
-      document.getElementById('trailLed').classList.toggle('active', trailsEnabled);
-      
-      if (trailsEnabled) {
-        addLogEntry('SYSTEM: Contact trails enabled.', 'system');
-      } else {
-        addLogEntry('SYSTEM: Contact trails disabled.', 'system');
-      }
-    });
+    if (trailToggle) {
+      trailToggle.addEventListener('click', () => {
+        trailsEnabled = !trailsEnabled;
+        const led = document.getElementById('trailLed');
+        if (led) led.classList.toggle('active', trailsEnabled);
+        
+        if (trailsEnabled) {
+          addLogEntry('SYSTEM: Contact trails enabled.', 'system');
+        } else {
+          addLogEntry('SYSTEM: Contact trails disabled.', 'system');
+        }
+      });
+    }
 
     // Input field validation
-    document.getElementById('targetBearing').addEventListener('change', (e) => {
-      let value = parseInt(e.target.value);
-      if (value < 0) e.target.value = 0;
-      if (value > 359) e.target.value = 359;
-    });
+    const bearingInput = document.getElementById('targetBearing');
+    if (bearingInput) {
+      bearingInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (value < 0) e.target.value = 0;
+        if (value > 359) e.target.value = 359;
+      });
+    }
 
-    document.getElementById('targetRange').addEventListener('change', (e) => {
-      let value = parseInt(e.target.value);
-      if (value < 1) e.target.value = 1;
-      if (value > 70) e.target.value = 70;
-    });
+    const rangeInput = document.getElementById('targetRange');
+    if (rangeInput) {
+      rangeInput.addEventListener('change', (e) => {
+        let value = parseInt(e.target.value);
+        if (value < 1) e.target.value = 1;
+        if (value > 70) e.target.value = 70;
+      });
+    }
 
     // Keyboard shortcuts
     window.addEventListener('keydown', (e) => {
       switch(e.key.toLowerCase()) {
         case 'f':
-          fireBtn.click();
+          if (fireBtn) fireBtn.click();
           break;
         case 's':
-          sonarToggle.click();
+          if (sonarToggle) sonarToggle.click();
           break;
         case 'g':
-          ghostToggle.click();
+          if (ghostToggle) ghostToggle.click();
           break;
         case 't':
-          trailToggle.click();
+          if (trailToggle) trailToggle.click();
           break;
         case '1':
         case '2':
