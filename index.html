@@ -702,13 +702,13 @@ const GAME_STATE = {
   ALERT: 'ALERT'
 };
 
-// State variables
+// State variables - SLOWED DOWN BY 75%
 let contacts = [
   { 
     id: 'GOBLIN-1', 
     x: 340, 
     y: 150, 
-    speed: 0.75, 
+    speed: 0.75 * 0.25, // 0.1875 - SLOWED DOWN
     angle: Math.PI / 4, 
     depth: 50,
     type: 'friendly',
@@ -722,7 +722,7 @@ let contacts = [
     id: 'SKUNK-2', 
     x: 580, 
     y: 400, 
-    speed: 0.6, 
+    speed: 0.6 * 0.25, // 0.15 - SLOWED DOWN
     angle: -Math.PI / 3, 
     depth: 200,
     type: 'hostile',
@@ -737,9 +737,9 @@ let contacts = [
 let torpedoes = [];
 let explosions = [];
 
-// System state
+// System state - SLOWED DOWN BY 75%
 const MAX_TRAIL_LENGTH = 10;
-const SWEEP_SPEED = Math.PI / 320;
+const SWEEP_SPEED = Math.PI / 320; // Keep angular speed same, but movement is slower
 let sweepAngle = 0;
 let lastTime = performance.now();
 let frameCount = 0;
@@ -857,7 +857,7 @@ function createEchoPing(baseFreq, volume, delay, bearingAngle, contactSpeed, dop
   }
 }
 
-// Play sonar ping with realistic echoes
+// Play sonar ping with realistic echoes - FIXED: Now uses continuous sound with delay nodes instead of discrete pings
 function playSonarPing(bearingAngle, contactSpeed) {
   try {
     if (!initAudio()) {
@@ -867,31 +867,63 @@ function playSonarPing(bearingAngle, contactSpeed) {
     // Base frequency for primary ping
     const baseFreq = 1200;
     
-    // Primary direct path ping (immediate)
-    createEchoPing(baseFreq, 0.15, 0, bearingAngle, contactSpeed);
+    // Create one continuous sound with natural echo characteristics using delay nodes
+    const osc = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
+    const panner = audioCtx.createStereoPanner();
     
-    // First-order echoes (shorter delay reflections) - ~60% of original volume
-    setTimeout(() => {
-      createEchoPing(baseFreq * 0.98, 0.09, 0, bearingAngle, contactSpeed, 0.98); // Slightly lower pitch
-    }, 250);
+    // Delay nodes for echo simulation (more realistic than discrete setTimeout pings)
+    const delay1 = audioCtx.createDelay(2.0);
+    const feedback1 = audioCtx.createGain();
+    const delay2 = audioCtx.createDelay(2.0);
+    const feedback2 = audioCtx.createGain();
     
-    setTimeout(() => {
-      createEchoPing(baseFreq * 1.02, 0.08, 0, bearingAngle, contactSpeed, 1.02); // Slightly higher pitch
-    }, 450);
+    // Create a simple reverb effect using multiple delays
+    osc.type = 'sine';
     
-    // Second-order echoes (medium delay reflections) - ~35% of original volume  
-    setTimeout(() => {
-      createEchoPing(baseFreq * 0.96, 0.05, 0, bearingAngle, contactSpeed, 0.96);
-    }, 800);
+    // Apply Doppler shift based on relative speed
+    let adjustedFreq = baseFreq;
+    if (typeof contactSpeed !== 'undefined' && contactSpeed > 0) {
+      const dopplerShift = 1 + (contactSpeed * 0.03); // ±3% shift max
+      adjustedFreq *= dopplerShift;
+    }
     
-    setTimeout(() => {
-      createEchoPing(baseFreq * 1.04, 0.04, 0, bearingAngle, contactSpeed, 1.04);
-    }, 1200);
+    osc.frequency.setValueAtTime(adjustedFreq, audioCtx.currentTime);
     
-    // Third-order echoes (longer delay reflections) - ~15% of original volume
-    setTimeout(() => {
-      createEchoPing(baseFreq * 0.94, 0.03, 0, bearingAngle, contactSpeed, 0.94);
-    }, 1800);
+    // Main sound envelope - longer attack and release for realistic sonar
+    gainNode.gain.setValueAtTime(0, audioCtx.currentTime);
+    gainNode.gain.linearRampToValueAtTime(0.15, audioCtx.currentTime + 0.05); // Attack
+    gainNode.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.8); // Long decay (800ms)
+    
+    // Echo chain 1 - first reflection (250ms delay, ~70% volume)
+    delay1.delayTime.setValueAtTime(0.25, audioCtx.currentTime);
+    feedback1.gain.setValueAtTime(0.7 * 0.15, audioCtx.currentTime); // 70% of main volume
+    
+    // Echo chain 2 - second reflection (450ms delay, ~50% volume)
+    delay2.delayTime.setValueAtTime(0.45, audioCtx.currentTime);
+    feedback2.gain.setValueAtTime(0.5 * 0.15, audioCtx.currentTime); // 50% of main volume
+    
+    // Connect graph: Oscillator -> Gain -> Panner -> Destination
+    //                   Gain -> Delay1 -> Feedback1 -> Destination
+    //                    Gain -> Delay2 -> Feedback2 -> Destination
+    
+    osc.connect(gainNode);
+    
+    // Main output
+    gainNode.connect(panner);
+    panner.connect(audioCtx.destination);
+    
+    // Echo outputs (simulated with delay nodes)
+    gainNode.connect(delay1);
+    delay1.connect(feedback1);
+    feedback1.connect(audioCtx.destination);
+    
+    gainNode.connect(delay2);
+    delay2.connect(feedback2);
+    feedback2.connect(audioCtx.destination);
+    
+    osc.start();
+    osc.stop(audioCtx.currentTime + 0.85); // Stop after long decay
     
     // Visual ping effects for echoes (echo rings)
     setTimeout(() => { createSonarEchoRing(sweepAngle, 0.7); }, 250);
@@ -1022,6 +1054,7 @@ function addGhostBlip(contact, angleFromCenter, dist) {
     const centerX = canvas.width / 2;
     const centerY = canvas.height / 2;
 
+    // SLOWED DOWN: Reduced ghost movement speed
     const ghostDist = Math.max(50, dist - (contact.speed * 3));
     const ghostX = centerX + Math.cos(angleFromCenter) * ghostDist;
     const ghostY = centerY + Math.sin(angleFromCenter) * ghostDist;
@@ -1139,7 +1172,7 @@ function drawCoordinateCrosshair() {
 
 // Animation effect rendering - FIXED: Added explosion collision detection
 function drawAnimationEffects() {
-  // Draw explosion effects (expanding orange/red circles)
+  // Draw explosion effects (expanding orange/red circles) - SLOWED DOWN expansion rate
   for (let i = explosions.length - 1; i >= 0; i--) {
     const effect = explosions[i];
     
@@ -1175,7 +1208,8 @@ function drawAnimationEffects() {
       }
     }
     
-    effect.radius += 4;
+    // SLOWED DOWN: Expansion rate reduced to 25% of original
+    effect.radius += 1.0;
     effect.opacity -= 0.015; // Fade over ~1.5 seconds (100 frames at 60fps)
   }
   
@@ -1192,9 +1226,10 @@ function drawAnimationEffects() {
     // Decrement lifetime (FIXED)
     torpedo.lifetime--;
     
+    // SLOWED DOWN: Torpedo speed reduced to 25% of original
     // Update torpedo position
-    torpedo.x += Math.cos(torpedo.angle) * torpedo.speed;
-    torpedo.y += Math.sin(torpedo.angle) * torpedo.speed;
+    torpedo.x += Math.cos(torpedo.angle) * (torpedo.speed * 0.25);
+    torpedo.y += Math.sin(torpedo.angle) * (torpedo.speed * 0.25);
     
     // Check bounds
     if (torpedo.x < -20 || torpedo.x > canvas.width + 20 || 
@@ -1227,7 +1262,7 @@ function drawAnimationEffects() {
     if (torpedo.trail.length > 15) {
       torpedo.trail.shift();
     }
-    torpedo.opacity -= 0.02;
+    torpedo.opacity -= 0.005; // SLOWED DOWN: Reduced decay rate to match slower movement
     
     ctx.shadowBlur = 0;
   }
@@ -1327,11 +1362,12 @@ function fireTorpedo(bearing, range) {
     const startY = centerY;
     
     // Create torpedo object - FIXED: Added lifetime property and proper initialization
+    // SLOWED DOWN: Reduced torpedo speed to 25% of original (0.625)
     const torpedo = {
       id: `TORP-${Date.now().toString().slice(-4)}`,
       x: startX,
       y: startY,
-      speed: 2.5, // Torpedo speed (pixels per frame)
+      speed: 2.5 * 0.25, // 0.625 - SLOWED DOWN
       angle: angle,
       depth: Math.random() * 300 + 100, // Random depth between 100-400m
       type: 'active',
@@ -1445,14 +1481,17 @@ function drawContacts() {
       contact.trail.push({ x: contact.x, y: contact.y });
       if (contact.trail.length > MAX_TRAIL_LENGTH) contact.trail.shift();
 
-      // Move contact with realistic speed
+      // Move contact with realistic speed - SLOWED DOWN by 75%
       let currentSpeed = contact.speed;
+      
+      // Apply depth-based speed adjustment, then SLOW DOWN
       if (contact.depth > 50) {
-        currentSpeed = Math.max(0.3, Math.min(2.0, contact.speed));
+        currentSpeed = Math.max(0.3 * 0.25, Math.min(2.0 * 0.25, contact.speed));
       } else {
-        currentSpeed = Math.max(0.8, Math.min(4.0, contact.speed));
+        currentSpeed = Math.max(0.8 * 0.25, Math.min(4.0 * 0.25, contact.speed));
       }
 
+      // SLOWED DOWN: Apply the speed reduction
       contact.x += Math.cos(contact.angle) * currentSpeed;
       contact.y += Math.sin(contact.angle) * currentSpeed;
 
@@ -1689,10 +1728,10 @@ function drawRadarSweep() {
       playRadarBleep();
     }
 
-    // Draw sonar waveforms
+    // Draw sonar waveforms - SLOWED DOWN: Reduced expansion rate to 25%
     for (let i = sonarWaves.length - 1; i >= 0; i--) {
       const wave = sonarWaves[i];
-      wave.radius += 3;
+      wave.radius += 0.75; // 3 * 0.25 = 0.75
       wave.opacity -= 0.02;
 
       if (wave.opacity <= 0) {
@@ -1713,10 +1752,10 @@ function drawRadarSweep() {
       }
     }
 
-    // Draw echo rings
+    // Draw echo rings - SLOWED DOWN: Reduced expansion rate to 25%
     for (let i = echoRings.length - 1; i >= 0; i--) {
       const ring = echoRings[i];
-      ring.radius += 8;
+      ring.radius += 2.0; // 8 * 0.25 = 2.0
       ring.opacity -= 0.05;
 
       if (ring.opacity <= 0 || ring.radius > ring.maxRadius) {
